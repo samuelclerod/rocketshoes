@@ -23,28 +23,57 @@ const CartContext = createContext<CartContextData>({} as CartContextData);
 
 export function CartProvider({ children }: CartProviderProps): JSX.Element {
   const [cart, setCart] = useState<Product[]>(() => {
-    // const storagedCart = Buscar dados do localStorage
-
-    // if (storagedCart) {
-    //   return JSON.parse(storagedCart);
-    // }
+    const storagedCart = localStorage.getItem('@RocketShoes:cart')
+    if (storagedCart) {
+      return JSON.parse(storagedCart);
+    }
 
     return [];
   });
 
+  const updateCart = (newCart: Product[]) => {
+    setCart(newCart);
+    localStorage.setItem('@RocketShoes:cart', JSON.stringify(newCart));
+  }
+
+  const checkStock = async (productId: number) => {
+    const { data } = await api.get<Stock>(`stock/${productId}`);
+    if (!data) return 0;
+    return data.amount
+  }
+
   const addProduct = async (productId: number) => {
     try {
-      // TODO
+      const stock = await checkStock(productId)
+      if (stock === 0) {
+
+      }
+      const index = cart.findIndex(product => product.id === productId);
+      let newCart = [...cart];;
+      if (index >= 0) {
+        if (newCart[index].amount >= stock) {
+          toast.error('Quantidade solicitada fora de estoque');
+          return;
+        }
+        newCart[index].amount += 1;
+      } else {
+        const { data } = await api.get(`products/${productId}`)
+        newCart = [...cart, { ...data, amount: 1 }];
+      }
+      updateCart(newCart);
     } catch {
-      // TODO
+      toast.error('Erro na adição do produto');
     }
   };
 
   const removeProduct = (productId: number) => {
     try {
-      // TODO
+      const index = cart.findIndex(p => p.id === productId);
+      if (index < 0) throw new Error();
+      const newCart = cart.filter(product => product.id !== productId)
+      updateCart(newCart)
     } catch {
-      // TODO
+      toast.error('Erro na remoção do produto');
     }
   };
 
@@ -53,9 +82,18 @@ export function CartProvider({ children }: CartProviderProps): JSX.Element {
     amount,
   }: UpdateProductAmount) => {
     try {
-      // TODO
+      if (amount <= 0) return;
+      const stock = await checkStock(productId);
+      console.log(stock);
+      if (amount > stock) {
+        toast.error('Quantidade solicitada fora de estoque');
+        return;
+      }
+      const newCart = cart
+        .map(product => product.id === productId ? { ...product, amount } : product);
+      updateCart(newCart);
     } catch {
-      // TODO
+      toast.error('Erro na alteração de quantidade do produto');
     }
   };
 
